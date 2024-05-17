@@ -1,39 +1,27 @@
-#importing required libraries
-
-from flask import Flask, request, render_template
-import numpy as np
-import pandas as pd
-from sklearn import metrics 
-import warnings
-import pickle
-warnings.filterwarnings('ignore')
+from flask import Flask, request, jsonify
 from feature import FeatureExtraction
-
-file = open("pickle/model.pkl","rb")
-gbc = pickle.load(file)
-file.close()
-
+from model import predict_phishing
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 
-@app.route("/", methods=["GET", "POST"])
-def index():
-    if request.method == "POST":
+@app.route("/predict", methods=["POST"])
+def predict():
+    data = request.get_json()
+    url = data.get('url')
+    print(url)
 
-        url = request.form["url"]
-        obj = FeatureExtraction(url)
-        x = np.array(obj.getFeaturesList()).reshape(1,30) 
+    # Initialize FeatureExtraction instance with the input URL
+    obj = FeatureExtraction(url)
 
-        y_pred =gbc.predict(x)[0]
-        #1 is safe       
-        #-1 is unsafe
-        y_pro_phishing = gbc.predict_proba(x)[0,0]
-        y_pro_non_phishing = gbc.predict_proba(x)[0,1]
-        # if(y_pred ==1 ):
-        pred = "It is {0:.2f} % safe to go ".format(y_pro_phishing*100)
-        return render_template('index.html',xx =round(y_pro_non_phishing,2),url=url )
-    return render_template("index.html", xx =-1)
+    # Extract features
+    features = obj.features
 
+    # Pass features to the prediction function
+    prediction, probability = predict_phishing(features)
+
+    return jsonify({'probability': probability.tolist(), 'prediction': prediction.tolist()})
 
 if __name__ == "__main__":
     app.run(debug=True)
